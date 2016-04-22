@@ -24,7 +24,8 @@ bach_array=normalize(bach_array)
 # TODO: graph training and validation error
 # TODO: output file as wav
 # TODO: increase validation set size
-
+# TODO: add stereo channel to extend dataset
+# TODO: try overlapping batches
 
 #Defining some hyper-params
 input_size = 1      #num_units and input_size will be the same
@@ -33,7 +34,7 @@ num_units = input_size*100    #this is the parameter for input_size in the basic
 
 seq_len = 80
 num_epochs=18000
-
+number_of_layers = 2
 def data_process(bach_array):
 
 
@@ -61,7 +62,7 @@ def data_process(bach_array):
     return target_list, bach_lists, num_seq
 
 
-training_set_size = (bach_array.shape[0]*3)/200
+training_set_size = (bach_array.shape[0]*3)/1000
 
 #
 # batch_size = bach_array
@@ -86,9 +87,13 @@ valid_target, valid_input, num_seq= data_process(bach_array[-training_set_size:]
 
 # MODEL
 cell = rnn_cell.BasicLSTMCell(num_units)
+cell = rnn_cell.MultiRNNCell([cell] * number_of_layers)
+
 
 inputs = [tf.placeholder(tf.float32,shape=[None,input_size]) for _ in range(seq_len-1)]
 result = tf.placeholder(tf.float32, shape=[None,input_size])
+
+
 
 outputs, states = rnn.rnn(cell, inputs, dtype=tf.float32)
 
@@ -122,6 +127,6 @@ with tf.Session() as sess:
         y1 = outputs3.eval(feed_dict=val_dict)
         y2 = val_dict[result]
         print "tc: {} Validation cost: {}, on Epoch {}".format(train_cost, valid_cost, k)
-    save_path = saver.save(sess, "model_lstm")
+    save_path = saver.save(sess, "model_lstm3")
     print("Model saved in file: %s" % save_path)
 
