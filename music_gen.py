@@ -34,7 +34,7 @@ num_units = input_size*100    #this is the parameter for input_size in the basic
 
 seq_len = 80
 num_epochs=18000
-number_of_layers = 2
+number_of_layers = 3
 def data_process(bach_array):
 
 
