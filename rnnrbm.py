@@ -11,7 +11,7 @@ from __future__ import print_function
 import glob
 import os
 import sys
-os.environ["THEANO_FLAGS"] = 'floatX=float32,device=gpu0,lib.cnmem=1'
+os.environ["THEANO_FLAGS"] = 'floatX=float32,device=gpu0,lib.cnmem=3300'
 
 import scipy
 from scipy.io.wavfile import read
@@ -53,7 +53,7 @@ def process_data():
     bach_array= np.array(bach_set[1])
     bach_array=normalize(bach_array)
     N=len(bach_array)
-    bach_array= bach_array[:N/10000]
+    bach_array= bach_array[:N/1000]
 
     zero_matrix=np.zeros((len(bach_array),256))
     zero_matrix[np.arange(len(bach_array)), bach_array] = 1
@@ -197,6 +197,11 @@ def build_rnnrbm(n_visible, n_hidden, n_hidden_recurrent):
             v_t, _, _, updates = build_rbm(T.zeros((n_visible,)), W, bv_t,
                                            bh_t, k=25)
         u_t = T.tanh(bu + T.dot(v_t, Wvu) + T.dot(u_tm1, Wuu))
+        gamma = 0.1
+        beta = 0
+        mean = u_t.mean()
+        std = u_t.std()
+        u_t = theano.tensor.nnet.bn.batch_normalization(u_t, gamma, beta, mean, std, mode='low_mem')
         return ([v_t, u_t], updates) if generate else [u_t, bv_t, bh_t]
 
     # For training, the deterministic recurrence is used to compute all the
@@ -224,8 +229,8 @@ class RnnRbm:
 
     def __init__(
         self,
-        n_hidden=150,
-        n_hidden_recurrent=100,
+        n_hidden=100,
+        n_hidden_recurrent=50,
         lr=0.001,
         r=(0, 256),
         dt=0.3
@@ -272,7 +277,7 @@ class RnnRbm:
             updates=updates_generate
         )
 
-    def train(self, files, batch_size=100, num_epochs=20):
+    def train(self, files, batch_size=100, num_epochs=40):
         '''Train the RNN-RBM via stochastic gradient descent (SGD) using MIDI
         files converted to piano-rolls.
 
@@ -292,8 +297,9 @@ class RnnRbm:
                    for f in files]'''
         
         dataset= process_data()
-
+        list_of_costs = []
         try:
+
             for epoch in range(num_epochs):
                 np.random.shuffle(dataset)
                 costs = []
@@ -305,10 +311,15 @@ class RnnRbm:
 
                 print('Epoch %i/%i' % (epoch + 1, num_epochs))
                 print(np.mean(costs))
+                list_of_costs.append(np.mean(costs))
                 sys.stdout.flush()
 
         except KeyboardInterrupt:
             print('Interrupted by user.')
+
+        import matplotlib.pyplot as plt
+        plt.plot(range(len(list_of_costs)),list_of_costs)
+        plt.show()
 
     def generate(self, filename, show=True):
         '''Generate a sample sequence, plot the resulting piano-roll and save
@@ -324,9 +335,10 @@ class RnnRbm:
 
         for i in range(piano_roll.shape[0]):
             index= np.where(piano_roll[i]==1)
-            if len(index) == 0:
-                index = [0]
-            choice= np.random.choice(index[0])
+            try:
+                choice= np.random.choice(index[0])
+            except:
+                choice = 127 # silence
             list_of_samples.append(choice)
 
         list_of_samples=np.asarray(list_of_samples)
@@ -348,7 +360,7 @@ class RnnRbm:
             pylab.title('generated piano-roll')
 
 
-def test_rnnrbm(batch_size=100, num_epochs=20):
+def test_rnnrbm(batch_size=100, num_epochs=40):
     model = RnnRbm()
     re = os.path.join(os.path.split(os.path.dirname(__file__))[0],
                       'data', 'Piano-midi.de', 'train', '*.mid')
