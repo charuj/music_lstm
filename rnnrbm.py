@@ -240,8 +240,8 @@ class RnnRbm:
 
     def __init__(
         self,
-        n_hidden=100,
-        n_hidden_recurrent=50,
+        n_hidden=600,
+        n_hidden_recurrent=300,
         lr=0.001,
         r=(0, 256),
         dt=0.3
