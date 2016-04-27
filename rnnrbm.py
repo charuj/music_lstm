@@ -12,7 +12,7 @@ import glob
 import os
 import sys
 os.environ["THEANO_FLAGS"] = 'floatX=float32,device=gpu0,lib.cnmem=3300'
-
+#os.environ["PATH"] = '$PATH:/usr/local/cuda-7.0/bin/:'
 import scipy
 from scipy.io.wavfile import read
 import numpy as np
@@ -99,9 +99,19 @@ def build_rbm(v, W, bv, bh, k):
         The `updates` object returned by scan.'''
 
     def gibbs_step(v):
+        epsilon = 0.000
+        gamma = 0.1
+        beta = 0
+        mean = v.mean()
+        std = v.std() + epsilon
+        v = theano.tensor.nnet.bn.batch_normalization(v, gamma, beta, mean, std, mode='low_mem')
+
         mean_h = T.nnet.sigmoid(T.dot(v, W) + bh)
         h = rng.binomial(size=mean_h.shape, n=1, p=mean_h,
                          dtype=theano.config.floatX)
+
+
+
         mean_v = T.nnet.sigmoid(T.dot(h, W.T) + bv)
         v = rng.binomial(size=mean_v.shape, n=1, p=mean_v,
                          dtype=theano.config.floatX)
@@ -197,10 +207,11 @@ def build_rnnrbm(n_visible, n_hidden, n_hidden_recurrent):
             v_t, _, _, updates = build_rbm(T.zeros((n_visible,)), W, bv_t,
                                            bh_t, k=25)
         u_t = T.tanh(bu + T.dot(v_t, Wvu) + T.dot(u_tm1, Wuu))
+        epsilon = 0.00
         gamma = 0.1
         beta = 0
         mean = u_t.mean()
-        std = u_t.std()
+        std = u_t.std() + epsilon
         u_t = theano.tensor.nnet.bn.batch_normalization(u_t, gamma, beta, mean, std, mode='low_mem')
         return ([v_t, u_t], updates) if generate else [u_t, bv_t, bh_t]
 
@@ -290,11 +301,11 @@ class RnnRbm:
             Number of epochs (pass over the training set) performed. The user
             can safely interrupt training with Ctrl+C at any time.'''
 
-        assert len(files) > 0, 'Training set is empty!' \
-                               ' (did you download the data files?)'
-        '''dataset = [midiread(f, self.r,
-                            self.dt).piano_roll.astype(theano.config.floatX)
-                   for f in files]'''
+        # assert len(files) > 0, 'Training set is empty!' \
+        #                        ' (did you download the data files?)'
+        # '''dataset = [midiread(f, self.r,
+        #                     self.dt).piano_roll.astype(theano.config.floatX)
+        #            for f in files]'''
         
         dataset= process_data()
         list_of_costs = []
@@ -311,7 +322,7 @@ class RnnRbm:
 
                 print('Epoch %i/%i' % (epoch + 1, num_epochs))
                 print(np.mean(costs))
-                list_of_costs.append(np.mean(costs))
+                list_of_costs.append(-1*np.mean(costs))
                 sys.stdout.flush()
 
         except KeyboardInterrupt:
